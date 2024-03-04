@@ -1,4 +1,6 @@
 import os
+from itertools import combinations
+
 import numpy as np
 import argparse
 import errno
@@ -211,6 +213,13 @@ def train_epoch(
             loss_total = loss_2d_proj
             losses['2d_proj'].update(loss_2d_proj.item(), batch_size)
             losses['total'].update(loss_total.item(), batch_size)
+
+        if predicted_3d_pos.size(1) > 1:
+            view_pairs = (*zip(*combinations(range(predicted_3d_pos.size(1)), 2)),)
+            consistency = consistency_loss(*predicted_3d_pos[:, view_pairs, ...].unbind(1))
+            losses["consistency"].update(consistency.item(), batch_size)
+            loss_total += args.lambda_consistency * consistency
+
         loss_total.backward()
         if (idx + 1) % accumulate_gradients == 0 or idx == len(train_loader) - 1:
             optimizer.step()
@@ -332,6 +341,7 @@ def train_with_config(args, opts):
             losses['3d_velocity'] = AverageMeter()
             losses['angle'] = AverageMeter()
             losses['angle_velocity'] = AverageMeter()
+            losses["consistency"] = AverageMeter()
             N = 0
                         
             # Curriculum Learning

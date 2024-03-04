@@ -41,6 +41,7 @@ lambda_lv: 0.0
 lambda_lg: 0.0
 lambda_a: 0.0
 lambda_av: 0.0
+lambda_consistency: 1.0
 
 # Augmentation
 synthetic: False

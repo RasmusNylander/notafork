@@ -62,7 +62,8 @@ def loss_mpjpe(predicted, target):
     """
     assert predicted.shape == target.shape
     return (predicted - target).norm(dim=-1).mean()
-    
+
+
 def weighted_mpjpe(predicted, target, w):
     """
     Weighted mean per-joint position error (i.e. mean Euclidean distance)
@@ -71,13 +72,15 @@ def weighted_mpjpe(predicted, target, w):
     assert w.shape[0] == predicted.shape[0]
     return torch.mean(w * torch.norm(predicted - target, dim=len(target.shape)-1))
 
+
 def loss_2d_weighted(predicted, target, conf):
     assert predicted.shape == target.shape
     predicted_2d = predicted[:,:,:,:2]
     target_2d = target[:,:,:,:2]
     diff = (predicted_2d - target_2d) * conf
     return torch.mean(torch.norm(diff, dim=-1))
-    
+
+
 def n_mpjpe(predicted: Tensor, target: Tensor) -> Tensor:
     """
     Normalized MPJPE (scale only), adapted from:
@@ -92,15 +95,6 @@ def n_mpjpe(predicted: Tensor, target: Tensor) -> Tensor:
     norm_target = (target * predicted).sum(dim=-1, keepdim=True).mean(dim=-2, keepdim=True)
     scale = norm_target / norm_predicted
     return loss_mpjpe(scale * predicted, target)
-
-def weighted_bonelen_loss(predict_3d_length, gt_3d_length):
-    loss_length = 0.001 * torch.pow(predict_3d_length - gt_3d_length, 2).mean()
-    return loss_length
-
-
-def weighted_boneratio_loss(predict_3d_length, gt_3d_length):
-    loss_length = 0.1 * torch.pow((predict_3d_length - gt_3d_length)/gt_3d_length, 2).mean()
-    return loss_length
 
 
 def get_limb_lengths(pose: Tensor) -> Tensor:
@@ -151,10 +145,6 @@ def loss_velocity(predicted: Tensor, target: Tensor) -> Tensor:
     if predicted.shape[-3] <= 1:
         return torch.FloatTensor(1).fill_(0.0)[0].to(predicted.device)
     return (predicted.diff(dim=-3) - target.diff(dim=-3)).norm(dim=-1).mean()
-
-def loss_joint(predicted, target):
-    assert predicted.shape == target.shape
-    return nn.L1Loss()(predicted, target)
 
 
 def loss_angle(x: Tensor, gt: Tensor) -> Tensor:

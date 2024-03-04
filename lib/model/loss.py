@@ -156,60 +156,53 @@ def loss_joint(predicted, target):
     assert predicted.shape == target.shape
     return nn.L1Loss()(predicted, target)
 
-def get_angles(x):
-    '''
-        Input: (N, T, 17, 3)
-        Output: (N, T, 16)
-    '''
-    limbs_id = [[0,1], [1,2], [2,3],
-         [0,4], [4,5], [5,6],
-         [0,7], [7,8], [8,9], [9,10],
-         [8,11], [11,12], [12,13],
-         [8,14], [14,15], [15,16]
-        ]
-    angle_id = [[ 0,  3],
-                [ 0,  6],
-                [ 3,  6],
-                [ 0,  1],
-                [ 1,  2],
-                [ 3,  4],
-                [ 4,  5],
-                [ 6,  7],
-                [ 7, 10],
-                [ 7, 13],
-                [ 8, 13],
-                [10, 13],
-                [ 7,  8],
-                [ 8,  9],
-                [10, 11],
-                [11, 12],
-                [13, 14],
-                [14, 15] ]
-    eps = 1e-7
-    limbs = x[:,:,limbs_id,:]
-    limbs = limbs[:,:,:,0,:]-limbs[:,:,:,1,:]
-    angles = limbs[:,:,angle_id,:]
-    angle_cos = F.cosine_similarity(angles[:,:,:,0,:], angles[:,:,:,1,:], dim=-1)
-    return torch.acos(angle_cos.clamp(-1+eps, 1-eps)) 
 
-def loss_angle(x, gt):
-    '''
-        Input: (N, T, 17, 3), (N, T, 17, 3)
-    '''
-    limb_angles_x = get_angles(x)
-    limb_angles_gt = get_angles(gt)
-    return nn.L1Loss()(limb_angles_x, limb_angles_gt)
+def loss_angle(x: Tensor, gt: Tensor) -> Tensor:
+    """Calculates the l1 loss of the limb angles of two poses.
 
-def loss_angle_velocity(x, gt):
+    :param x: The predicted pose. Shape: (B?, V?, S?, 17, 3).
+    :param gt: The target pose. Shape: (B?, V?, S?, 17, 3).
+    :return: The l1 loss of the limb angles. Shape: (1,).
     """
-    Mean per-angle velocity error (i.e. mean Euclidean distance of the 1st derivative)
+    limb_angles_x = limb_angles(x)
+    limb_angles_gt = limb_angles(gt)
+    return nn.functional.l1_loss(limb_angles_x, limb_angles_gt)
+
+
+def loss_angle_velocity(x: Tensor, gt: Tensor) -> Tensor:
+    """Mean per-angle velocity error (i.e. mean Euclidean distance of the 1st derivative)
+
+    :param x: The predicted pose. Shape: (V?, B?, S, 17, 3).
+    :param gt: The target pose. Shape: (V?, B?, S, 17, 3).
+    :return: The mean per-angle velocity error. Shape: (1,).
     """
     assert x.shape == gt.shape
-    if x.shape[1]<=1:
-        return torch.FloatTensor(1).fill_(0.)[0].to(x.device)
-    x_a = get_angles(x)
-    gt_a = get_angles(gt)
-    x_av = x_a[:,1:] - x_a[:,:-1]
-    gt_av = gt_a[:,1:] - gt_a[:,:-1]
-    return nn.L1Loss()(x_av, gt_av)
+    if x.shape[-3] <= 1:
+        return torch.FloatTensor(1).fill_(0.0)[0].to(x.device)
+    x_a = limb_angles(x)
+    gt_a = limb_angles(gt)
+    x_av = x_a.diff(dim=-2)
+    gt_av = gt_a.diff(dim=-2)
+    return nn.functional.l1_loss(x_av, gt_av)
 
+
+def limb_angles(pose: Tensor) -> Tensor:
+    """Computes the angles between the limbs of a 3D pose in Human3.6M format.
+
+    :param pose: The h36m pose to compute the limb angles for. Shape: (V?, B?, S?, 17, 3)
+    :return: The limb angles. Shape: (V?, B?, S?, 16)
+    """
+    joint_connections = [
+        (0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6), (0, 7), (7, 8), (8, 9),
+        (9, 10), (8, 11), (11, 12), (12, 13), (8, 14), (14, 15), (15, 16),
+    ]
+    limb_connections = [
+        (0, 3), (0, 6), (3, 6), (0, 1), (1, 2), (3, 4), (4, 5), (6, 7), (7, 10), (7, 13),
+        (8, 13), (10, 13), (7, 8), (8, 9), (10, 11), (11, 12), (13, 14), (14, 15),
+    ]
+    limb_endpoints = pose[..., joint_connections, :]
+    limb_vectors = limb_endpoints.diff(dim=-2).squeeze(-2)
+    limb_pairs = limb_vectors[..., limb_connections, :]
+    limb_angle_cos = F.cosine_similarity(limb_pairs[..., 0, :], limb_pairs[..., 1, :], dim=-1)
+    eps = 1e-7  # 1e-9 is too small to prevent crash on back-propagation
+    return limb_angle_cos.clamp(-1 + eps, 1 - eps).acos()

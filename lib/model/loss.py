@@ -59,7 +59,7 @@ def loss_mpjpe(predicted, target):
     often referred to as "Protocol #1" in many papers.
     """
     assert predicted.shape == target.shape
-    return torch.mean(torch.norm(predicted - target, dim=len(target.shape)-1))
+    return (predicted - target).norm(dim=-1).mean()
     
 def weighted_mpjpe(predicted, target, w):
     """

@@ -1,28 +1,24 @@
+from pathlib import Path
+from typing import Literal
+
 import torch
 import numpy as np
-import glob
-import os
-import io
 import random
-import pickle
 from torch.utils.data import Dataset, DataLoader
 from lib.data.augmentation import Augmenter3D
 from lib.utils.tools import read_pkl
 from lib.utils.utils_data import flip_data
     
 class MotionDataset(Dataset):
-    def __init__(self, args, subset_list, data_split): # data_split: train/test
+    def __init__(self, data_root: Path, subset_list: list[str], data_split: Literal["test", "train"]): # data_split: train/test
         np.random.seed(0)
-        self.data_root = args.data_root
+        self.data_root = data_root
         self.subset_list = subset_list
         self.data_split = data_split
-        file_list_all = []
+        self.file_list = []
         for subset in self.subset_list:
-            data_path = os.path.join(self.data_root, subset, self.data_split)
-            motion_list = sorted(os.listdir(data_path))
-            for i in motion_list:
-                file_list_all.append(os.path.join(data_path, i))
-        self.file_list = file_list_all
+            data_path = self.data_root / subset / self.data_split
+            self.file_list += sorted(data_path.glob('*.pkl'))
         
     def __len__(self):
         'Denotes the total number of samples'
@@ -33,7 +29,7 @@ class MotionDataset(Dataset):
 
 class MotionDataset3D(MotionDataset):
     def __init__(self, args, subset_list, data_split):
-        super(MotionDataset3D, self).__init__(args, subset_list, data_split)
+        super(MotionDataset3D, self).__init__(Path(args["data_root"]), subset_list, data_split)
         self.flip = args.flip
         self.synthetic = args.synthetic
         self.aug = Augmenter3D(args)

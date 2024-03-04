@@ -4,6 +4,9 @@ import torch.nn.functional as F
 import numpy as np
 import copy
 
+from tqdm import tqdm
+
+
 def crop_scale(motion, scale_range=[1, 1]):
     '''
         Motion: [(M), T, 17, 3].
@@ -88,25 +91,26 @@ def resample(ori_len, target_len, replay=False, randomness=True):
             result = np.linspace(0, ori_len, num=target_len, endpoint=False, dtype=int)
         return result
 
-def split_clips(vid_list, n_frames, data_stride):
+def split_clips(vid_list: list[str], n_frames: int, data_stride: int) -> list[range]:
     result = []
     n_clips = 0
     st = 0
     i = 0
     saved = set()
-    while i<len(vid_list):
-        i += 1
-        if i-st == n_frames:
-            result.append(range(st,i))
-            saved.add(vid_list[i-1])
-            st = st + data_stride
-            n_clips += 1
-        if i==len(vid_list):
-            break
-        if vid_list[i]!=vid_list[i-1]: 
-            if not (vid_list[i-1] in saved):
-                resampled = resample(i-st, n_frames) + st
-                result.append(resampled)
+    with tqdm(total=len(vid_list), desc="splitting clips") as pbar:
+        while i<len(vid_list):
+            i += 1; pbar.update(1)
+            if i-st == n_frames:
+                result.append(range(st,i))
                 saved.add(vid_list[i-1])
-            st = i
+                st = st + data_stride
+                n_clips += 1
+            if i==len(vid_list):
+                break
+            if vid_list[i]!=vid_list[i-1]:
+                if not (vid_list[i-1] in saved):
+                    resampled = resample(i-st, n_frames) + st
+                    result.append(resampled)
+                    saved.add(vid_list[i-1])
+                st = i
     return result

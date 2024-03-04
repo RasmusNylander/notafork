@@ -160,6 +160,7 @@ def train_epoch(
         optimizer: torch.optim.Optimizer,
         has_3d: bool,
         has_gt: bool,
+        accumulate_gradients: int = 1,
 ):
     model_pos.train()
     for idx, (batch_input, batch_gt) in tqdm(enumerate(train_loader)):    
@@ -182,7 +183,6 @@ def train_epoch(
         as_batched = (-1, *batch_input.shape[2:])
         predicted_3d_pos = model_pos(batch_input.view(as_batched)).view(batch_input.shape)    # (B*, T, 17, 3)
 
-        optimizer.zero_grad()
         if has_3d:
             loss_3d_pos = loss_mpjpe(predicted_3d_pos, batch_gt)
             loss_3d_scale = n_mpjpe(predicted_3d_pos, batch_gt)
@@ -212,7 +212,9 @@ def train_epoch(
             losses['2d_proj'].update(loss_2d_proj.item(), batch_size)
             losses['total'].update(loss_total.item(), batch_size)
         loss_total.backward()
-        optimizer.step()
+        if (idx + 1) % accumulate_gradients == 0 or idx == len(train_loader) - 1:
+            optimizer.step()
+            optimizer.zero_grad(set_to_none=True)
 
 def train_with_config(args, opts):
     print(args)
@@ -333,6 +335,7 @@ def train_with_config(args, opts):
             N = 0
                         
             # Curriculum Learning
+            optimizer.zero_grad()
             if args.train_2d and (epoch >= args.pretrain_3d_curriculum):
                 train_epoch(args, model_pos, posetrack_loader_2d, losses, optimizer, has_3d=False, has_gt=True)
                 train_epoch(args, model_pos, instav_loader_2d, losses, optimizer, has_3d=False, has_gt=False)

@@ -169,18 +169,19 @@ def train_epoch(
             batch_gt = batch_gt.cuda()
         with torch.no_grad():
             if args.no_conf:
-                batch_input = batch_input[:, :, :, :2]
+                batch_input = batch_input[..., :2]
             if not has_3d:
-                conf = copy.deepcopy(batch_input[:,:,:,2:])    # For 2D data, weight/confidence is at the last channel
+                conf = copy.deepcopy(batch_input[..., 2:])    # For 2D data, weight/confidence is at the last channel
             if args.rootrel:
-                batch_gt = batch_gt - batch_gt[:,:,0:1,:]
+                batch_gt = batch_gt - batch_gt[..., 0:1, :]
             else:
-                batch_gt[:,:,:,2] = batch_gt[:,:,:,2] - batch_gt[:,0:1,0:1,2] # Place the depth of first frame root to 0.
+                batch_gt[..., 2] = batch_gt[..., 2] - batch_gt[..., 0:1, 0:1, 2] # Place the depth of first frame root to 0.
             if args.mask or args.noise:
                 batch_input = args.aug.augment2D(batch_input, noise=(args.noise and has_gt), mask=args.mask)
         # Predict 3D poses
-        predicted_3d_pos = model_pos(batch_input)    # (N, T, 17, 3)
-        
+        as_batched = (-1, *batch_input.shape[2:])
+        predicted_3d_pos = model_pos(batch_input.view(as_batched)).view(batch_input.shape)    # (B*, T, 17, 3)
+
         optimizer.zero_grad()
         if has_3d:
             loss_3d_pos = loss_mpjpe(predicted_3d_pos, batch_gt)

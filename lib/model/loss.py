@@ -139,16 +139,18 @@ def loss_limb_gt(x: Tensor, gt: Tensor) -> Tensor:
     limb_lens_gt = get_limb_lengths(gt)  # (N, T, 16)
     return nn.functional.l1_loss(limb_lens_x, limb_lens_gt)
 
-def loss_velocity(predicted, target):
-    """
-    Mean per-joint velocity error (i.e. mean Euclidean distance of the 1st derivative)
+
+def loss_velocity(predicted: Tensor, target: Tensor) -> Tensor:
+    """Mean per-joint velocity error (i.e. mean Euclidean distance of the 1st derivative (i.e. the difference between
+    consecutive frames)).
+    :param predicted: The predicted pose. Shape: (B?, V?, S, J, D).
+    :param target: The target pose. Shape: (B?, V?, S, J, D).
+    :return: The mean per-joint velocity error. Shape: (1,).
     """
     assert predicted.shape == target.shape
-    if predicted.shape[1]<=1:
-        return torch.FloatTensor(1).fill_(0.)[0].to(predicted.device)
-    velocity_predicted = predicted[:,1:] - predicted[:,:-1]
-    velocity_target = target[:,1:] - target[:,:-1]
-    return torch.mean(torch.norm(velocity_predicted - velocity_target, dim=-1))
+    if predicted.shape[-3] <= 1:
+        return torch.FloatTensor(1).fill_(0.0)[0].to(predicted.device)
+    return (predicted.diff(dim=-3) - target.diff(dim=-3)).norm(dim=-1).mean()
 
 def loss_joint(predicted, target):
     assert predicted.shape == target.shape

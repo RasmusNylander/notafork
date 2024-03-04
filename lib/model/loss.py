@@ -102,40 +102,42 @@ def weighted_boneratio_loss(predict_3d_length, gt_3d_length):
     loss_length = 0.1 * torch.pow((predict_3d_length - gt_3d_length)/gt_3d_length, 2).mean()
     return loss_length
 
-def get_limb_lens(x):
-    '''
-        Input: (N, T, 17, 3)
-        Output: (N, T, 16)
-    '''
-    limbs_id = [[0,1], [1,2], [2,3],
-         [0,4], [4,5], [5,6],
-         [0,7], [7,8], [8,9], [9,10],
-         [8,11], [11,12], [12,13],
-         [8,14], [14,15], [15,16]
-        ]
-    limbs = x[:,:,limbs_id,:]
-    limbs = limbs[:,:,:,0,:]-limbs[:,:,:,1,:]
-    limb_lens = torch.norm(limbs, dim=-1)
-    return limb_lens
 
-def loss_limb_var(x):
-    '''
-        Input: (N, T, 17, 3)
-    '''
-    if x.shape[1]<=1:
-        return torch.FloatTensor(1).fill_(0.)[0].to(x.device)
-    limb_lens = get_limb_lens(x)
-    limb_lens_var = torch.var(limb_lens, dim=1)
-    limb_loss_var = torch.mean(limb_lens_var)
-    return limb_loss_var
+def get_limb_lengths(pose: Tensor) -> Tensor:
+    """Computes the lengths of the limbs of a 3D pose in Human3.6M format.
 
-def loss_limb_gt(x, gt):
-    '''
-        Input: (N, T, 17, 3), (N, T, 17, 3)
-    '''
-    limb_lens_x = get_limb_lens(x)
-    limb_lens_gt = get_limb_lens(gt) # (N, T, 16)
-    return nn.L1Loss()(limb_lens_x, limb_lens_gt)
+    :param pose: The h36m pose to compute the limb lengths for. Shape: (B?, V?, S?, 17, 3)
+    :return: The limb lengths. Shape: (B?, V?, S?, 16)
+    """
+    joint_connections = [  # TODO: This is also used below. Use it again and it should be extracted.
+        (0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6), (0, 7), (7, 8), (8, 9),
+        (9, 10), (8, 11), (11, 12), (12, 13), (8, 14), (14, 15), (15, 16),
+    ]
+    limb_endpoints = pose[..., joint_connections, :]
+    limb_vectors = limb_endpoints.diff(dim=-2).squeeze(-2)
+    limb_lengths = limb_vectors.norm(dim=-1)
+    return limb_lengths
+
+
+def loss_limb_var(x: Tensor) -> Tensor:
+    """Calculate the variance of limb lengths
+
+    :param x: The 3D H3.6M skeleton, shape (B?, V?, S?, 17, 3)
+    :return: The variance of the limb lengths, shape (B?, V?, S?, 16)
+    """
+    if x.shape[-3] <= 1:
+        return torch.FloatTensor(1).fill_(0.0)[0].to(x.device)
+    limb_lens = get_limb_lengths(x)
+    return limb_lens.var(dim=-2).mean()
+
+
+def loss_limb_gt(x: Tensor, gt: Tensor) -> Tensor:
+    """
+    Input: (N, T, 17, 3), (N, T, 17, 3)
+    """
+    limb_lens_x = get_limb_lengths(x)
+    limb_lens_gt = get_limb_lengths(gt)  # (N, T, 16)
+    return nn.functional.l1_loss(limb_lens_x, limb_lens_gt)
 
 def loss_velocity(predicted, target):
     """

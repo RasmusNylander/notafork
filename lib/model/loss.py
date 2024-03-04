@@ -58,7 +58,7 @@ def p_mpjpe(predicted_batch: ndarray, target_batch: ndarray) -> ndarray:
 
 # PyTorch-based errors (for losses)
 
-def loss_mpjpe(predicted, target):
+def loss_mpjpe(predicted: Tensor, target: Tensor) -> Tensor:
     """
     Mean per-joint position error (i.e. mean Euclidean distance),
     often referred to as "Protocol #1" in many papers.

@@ -67,12 +67,20 @@ def loss_mpjpe(predicted: Tensor, target: Tensor) -> Tensor:
     return (predicted - target).norm(dim=-1).mean()
 
 
-def loss_2d_weighted(predicted, target, conf):
+def loss_2d_weighted(predicted: Tensor, target: Tensor, conf: Tensor) -> Tensor:
+    """Weighted mean per-joint position error (i.e. mean Euclidean distance) (in 2D).
+    NOTE: This function seems redundant, as it is essentially the same as weighted_mpjpe. It may be removed in the
+    future.
+    :param predicted: The predicted pose. Shape: (B?, V?, S?, J, 2+).
+    :param target: The target pose. Shape: (B?, V?, S?, J, 2+).
+    :param conf: The confidence of each joint. Shape: (B?, V?, S?, J).
+    :return: The weighted MPJPE. Shape: (1,).
+    """
     assert predicted.shape == target.shape
-    predicted_2d = predicted[:,:,:,:2]
-    target_2d = target[:,:,:,:2]
-    diff = (predicted_2d - target_2d) * conf
-    return torch.mean(torch.norm(diff, dim=-1))
+    predicted_2d = predicted[..., :2]
+    target_2d = target[..., :2]
+    diff = (predicted_2d - target_2d) * conf.unsqueeze(-1)
+    return diff.norm(dim=-1).mean()
 
 
 def n_mpjpe(predicted: Tensor, target: Tensor) -> Tensor:

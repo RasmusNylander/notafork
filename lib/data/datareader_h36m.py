@@ -61,30 +61,21 @@ class DataReaderH36M(object):
         return trainset.T, testset.T
 
     def read_3d(self):
-        train_labels = self.dt_dataset['train']['joint3d_image'][::self.sample_stride, :, :3].astype(np.float32)  # [N, 17, 3]
-        test_labels = self.dt_dataset['test']['joint3d_image'][::self.sample_stride, :, :3].astype(np.float32)    # [N, 17, 3]
+        train_labels = self.dt_dataset['train']['joint3d_image'][::self.sample_stride, :, :3].astype(np.float32).T  # [N, 17, 3]
+        test_labels = self.dt_dataset['test']['joint3d_image'][::self.sample_stride, :, :3].astype(np.float32).T    # [N, 17, 3]
         # map to [-1, 1]
-        for idx, camera_name in enumerate(self.dt_dataset['train']['camera_name']):
-            if camera_name == '54138969' or camera_name == '60457274':
-                res_w, res_h = 1000, 1002
-            elif camera_name == '55011271' or camera_name == '58860488':
-                res_w, res_h = 1000, 1000
-            else:
-                assert 0, '%d data item has an invalid camera name' % idx
-            train_labels[idx, :, :2] = train_labels[idx, :, :2] / res_w * 2 - [1, res_h / res_w]
-            train_labels[idx, :, 2:] = train_labels[idx, :, 2:] / res_w * 2
-            
-        for idx, camera_name in enumerate(self.dt_dataset['test']['camera_name']):
-            if camera_name == '54138969' or camera_name == '60457274':
-                res_w, res_h = 1000, 1002
-            elif camera_name == '55011271' or camera_name == '58860488':
-                res_w, res_h = 1000, 1000
-            else:
-                assert 0, '%d data item has an invalid camera name' % idx
-            test_labels[idx, :, :2] = test_labels[idx, :, :2] / res_w * 2 - [1, res_h / res_w]
-            test_labels[idx, :, 2:] = test_labels[idx, :, 2:] / res_w * 2
-            
-        return train_labels, test_labels
+        resolution = self.resolution("train")
+        train_labels /= resolution[0] / 2
+        train_labels[0] -= 1
+        train_labels[1] -= resolution[1] / resolution[0]
+
+        resolution = self.resolution("test")
+        test_labels /= resolution[0] / 2
+        test_labels[0] -= 1
+        test_labels[1] -= resolution[1] / resolution[0]
+
+        return train_labels.T, test_labels.T
+
     def read_hw(self):
         if self.test_hw is not None:
             return self.test_hw

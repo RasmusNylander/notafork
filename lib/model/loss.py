@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
+from torch import Tensor
+
 
 # Numpy-based errors
 

@@ -185,6 +185,8 @@ def train_epoch(
         as_batched = (-1, *batch_input.shape[2:])
         predicted_3d_pos = model_pos(batch_input.view(as_batched)).view(batch_input.shape)    # (B*, T, 17, 3)
 
+        special_performer = performer_id == 1
+
         function_weight_label = (
             (loss_mpjpe, 1, "3d_pos"), (n_mpjpe, args.lambda_scale, "3d_scale"),
             (loss_velocity, args.lambda_3d_velocity, "3d_velocity"), (lambda x, t: loss_limb_var(x), args.lambda_lv, "lv"),
@@ -192,16 +194,14 @@ def train_epoch(
             (loss_angle_velocity, args.lambda_av, "angle_velocity")
         )
         loss_total = torch.zeros(1, device=predicted_3d_pos.device)
-        if has_3d:
-            for loss, weight, name in function_weight_label:
-                value = loss(predicted_3d_pos, batch_gt)
-                losses[name].update(value.item(), batch_size)
-                loss_total += weight * value
-        else:
-            loss_2d_proj = loss_2d_weighted(predicted_3d_pos, batch_gt, conf)
-            loss_total += loss_2d_proj
-            losses['2d_proj'].update(loss_2d_proj.item(), batch_size)
-            losses['total'].update(loss_total.item(), batch_size)
+        for loss, weight, name in function_weight_label:
+            value = loss(predicted_3d_pos[special_performer], batch_gt[special_performer])
+            losses[name].update(value.item(), batch_size)
+            loss_total += weight * value
+
+        loss_2d_proj = loss_2d_weighted(predicted_3d_pos[~special_performer], batch_gt[~special_performer], conf[~special_performer])
+        loss_total += loss_2d_proj
+        losses['2d_proj'].update(loss_2d_proj.item(), batch_size)
 
         if predicted_3d_pos.size(1) > 1:
             view_pairs = (*zip(*combinations(range(predicted_3d_pos.size(1)), 2)),)
@@ -209,6 +209,7 @@ def train_epoch(
             losses["consistency"].update(consistency.item(), batch_size)
             loss_total += args.lambda_consistency * consistency
 
+        losses['total'].update(loss_total.item(), batch_size)
         loss_total.backward()
         if (idx + 1) % accumulate_gradients == 0 or idx == len(train_loader) - 1:
             optimizer.step()

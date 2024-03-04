@@ -1,6 +1,8 @@
 # Adapted from Optimizing Network Structure for 3D Human Pose Estimation (ICCV 2019) (https://github.com/CHUNYUWANG/lcn-pose/blob/master/tools/data.py)
+from typing import Literal
 
 import numpy as np
+from numpy import ndarray
 import os, sys
 import random
 import copy
@@ -21,41 +23,42 @@ class DataReaderH36M(object):
         self.data_stride_train = data_stride_train
         self.data_stride_test = data_stride_test
         self.read_confidence = read_confidence
-        
+
+    def resolution(self, set: Literal["train", "test"]):
+        camera_names = self.dt_dataset[set]["camera_name"]
+        resolution = np.empty((2, len(camera_names)), dtype=np.int32)
+        resolution[:] = 1000
+        resolution[..., (camera_names == '60457274') | (camera_names == '54138969')] = 1002
+        return resolution
+
     def read_2d(self):
-        trainset = self.dt_dataset['train']['joint_2d'][::self.sample_stride, :, :2].astype(np.float32)  # [N, 17, 2]
-        testset = self.dt_dataset['test']['joint_2d'][::self.sample_stride, :, :2].astype(np.float32)  # [N, 17, 2]
+        trainset = self.dt_dataset['train']['joint_2d'][::self.sample_stride, :, :2].astype(np.float32).T  # [N, 17, 2]
+        testset = self.dt_dataset['test']['joint_2d'][::self.sample_stride, :, :2].astype(np.float32).T  # [N, 17, 2]
         # map to [-1, 1]
-        for idx, camera_name in enumerate(self.dt_dataset['train']['camera_name']):
-            if camera_name == '54138969' or camera_name == '60457274':
-                res_w, res_h = 1000, 1002
-            elif camera_name == '55011271' or camera_name == '58860488':
-                res_w, res_h = 1000, 1000
-            else:
-                assert 0, '%d data item has an invalid camera name' % idx
-            trainset[idx, :, :] = trainset[idx, :, :] / res_w * 2 - [1, res_h / res_w]
-        for idx, camera_name in enumerate(self.dt_dataset['test']['camera_name']):
-            if camera_name == '54138969' or camera_name == '60457274':
-                res_w, res_h = 1000, 1002
-            elif camera_name == '55011271' or camera_name == '58860488':
-                res_w, res_h = 1000, 1000
-            else:
-                assert 0, '%d data item has an invalid camera name' % idx
-            testset[idx, :, :] = testset[idx, :, :] / res_w * 2 - [1, res_h / res_w]
+        resolution = self.resolution("train")
+        trainset /= resolution[0] / 2
+        trainset[0] -= 1
+        trainset[1] -= resolution[1] / resolution[0]
+
+        resolution = self.resolution("test")
+        testset /= resolution[0] / 2
+        testset[0] -= 1
+        testset[1] -= resolution[1] / resolution[0]
+
         if self.read_confidence:
             if 'confidence' in self.dt_dataset['train'].keys():
-                train_confidence = self.dt_dataset['train']['confidence'][::self.sample_stride].astype(np.float32)  
-                test_confidence = self.dt_dataset['test']['confidence'][::self.sample_stride].astype(np.float32)  
-                if len(train_confidence.shape)==2: # (1559752, 17)
-                    train_confidence = train_confidence[:,:,None]
-                    test_confidence = test_confidence[:,:,None]
+                train_confidence = self.dt_dataset['train']['confidence'][::self.sample_stride].astype(np.float32).T
+                test_confidence = self.dt_dataset['test']['confidence'][::self.sample_stride].astype(np.float32).T
+                if len(train_confidence.shape)==2: # (17, 1559752)
+                    train_confidence = train_confidence[None]
+                    test_confidence = test_confidence[None]
             else:
                 # No conf provided, fill with 1.
-                train_confidence = np.ones(trainset.shape)[:,:,0:1]
-                test_confidence = np.ones(testset.shape)[:,:,0:1]
-            trainset = np.concatenate((trainset, train_confidence), axis=2)  # [N, 17, 3]
-            testset = np.concatenate((testset, test_confidence), axis=2)  # [N, 17, 3]
-        return trainset, testset
+                train_confidence = np.ones(1, *trainset.shape[1:])
+                test_confidence = np.ones(1, *testset.shape[1:])
+            trainset = np.concatenate((trainset, train_confidence), axis=0)  # [N, 17, 3]
+            testset = np.concatenate((testset, test_confidence), axis=0)  # [N, 17, 3]
+        return trainset.T, testset.T
 
     def read_3d(self):
         train_labels = self.dt_dataset['train']['joint3d_image'][::self.sample_stride, :, :3].astype(np.float32)  # [N, 17, 3]

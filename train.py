@@ -185,32 +185,21 @@ def train_epoch(
         as_batched = (-1, *batch_input.shape[2:])
         predicted_3d_pos = model_pos(batch_input.view(as_batched)).view(batch_input.shape)    # (B*, T, 17, 3)
 
+        function_weight_label = (
+            (loss_mpjpe, 1, "3d_pos"), (n_mpjpe, args.lambda_scale, "3d_scale"),
+            (loss_velocity, args.lambda_3d_velocity, "3d_velocity"), (lambda x, t: loss_limb_var(x), args.lambda_lv, "lv"),
+            (loss_limb_gt, args.lambda_lg, "lg"), (loss_angle, args.lambda_a, "angle"),
+            (loss_angle_velocity, args.lambda_av, "angle_velocity")
+        )
+        loss_total = torch.zeros(1, device=predicted_3d_pos.device)
         if has_3d:
-            loss_3d_pos = loss_mpjpe(predicted_3d_pos, batch_gt)
-            loss_3d_scale = n_mpjpe(predicted_3d_pos, batch_gt)
-            loss_3d_velocity = loss_velocity(predicted_3d_pos, batch_gt)
-            loss_lv = loss_limb_var(predicted_3d_pos)
-            loss_lg = loss_limb_gt(predicted_3d_pos, batch_gt)
-            loss_a = loss_angle(predicted_3d_pos, batch_gt)
-            loss_av = loss_angle_velocity(predicted_3d_pos, batch_gt)
-            loss_total = loss_3d_pos + \
-                         args.lambda_scale       * loss_3d_scale + \
-                         args.lambda_3d_velocity * loss_3d_velocity + \
-                         args.lambda_lv          * loss_lv + \
-                         args.lambda_lg          * loss_lg + \
-                         args.lambda_a           * loss_a  + \
-                         args.lambda_av          * loss_av
-            losses['3d_pos'].update(loss_3d_pos.item(), batch_size)
-            losses['3d_scale'].update(loss_3d_scale.item(), batch_size)
-            losses['3d_velocity'].update(loss_3d_velocity.item(), batch_size)
-            losses['lv'].update(loss_lv.item(), batch_size)
-            losses['lg'].update(loss_lg.item(), batch_size)
-            losses['angle'].update(loss_a.item(), batch_size)
-            losses['angle_velocity'].update(loss_av.item(), batch_size)
-            losses['total'].update(loss_total.item(), batch_size)
+            for loss, weight, name in function_weight_label:
+                value = loss(predicted_3d_pos, batch_gt)
+                losses[name].update(value.item(), batch_size)
+                loss_total += weight * value
         else:
             loss_2d_proj = loss_2d_weighted(predicted_3d_pos, batch_gt, conf)
-            loss_total = loss_2d_proj
+            loss_total += loss_2d_proj
             losses['2d_proj'].update(loss_2d_proj.item(), batch_size)
             losses['total'].update(loss_total.item(), batch_size)
 
@@ -224,6 +213,7 @@ def train_epoch(
         if (idx + 1) % accumulate_gradients == 0 or idx == len(train_loader) - 1:
             optimizer.step()
             optimizer.zero_grad(set_to_none=True)
+
 
 def train_with_config(args, opts):
     print(args)

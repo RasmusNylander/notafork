@@ -1,19 +1,21 @@
 import torch
 import torch.nn as nn
 import numpy as np
+from numpy import ndarray
 import torch.nn.functional as F
 from torch import Tensor
 
 
 # Numpy-based errors
 
-def mpjpe(predicted, target):
-    """
-    Mean per-joint position error (i.e. mean Euclidean distance),
-    often referred to as "Protocol #1" in many papers.
+def mpjpe(predicted: ndarray, target: ndarray) -> ndarray:
+    """Mean per-joint position error (i.e. mean Euclidean distance), often referred to as "Protocol #1" in many papers.
+    :param predicted: The predicted pose. Shape: (V?, B?, S?, J, D).
+    :param target: The target pose. Shape: (V?, B?, S?, J, D).
+    :return: The MPJPE. Shape: (1,).
     """
     assert predicted.shape == target.shape
-    return np.mean(np.linalg.norm(predicted - target, axis=len(target.shape)-1), axis=1)
+    return np.linalg.norm(predicted - target, axis=-1).mean()
 
 def p_mpjpe(predicted, target):
     """

@@ -17,42 +17,43 @@ def mpjpe(predicted: ndarray, target: ndarray) -> ndarray:
     assert predicted.shape == target.shape
     return np.linalg.norm(predicted - target, axis=-1).mean()
 
-def p_mpjpe(predicted, target):
-    """
-    Pose error: MPJPE after rigid alignment (scale, rotation, and translation),
-    often referred to as "Protocol #2" in many papers.
-    """
-    assert predicted.shape == target.shape
-    
-    muX = np.mean(target, axis=1, keepdims=True)
-    muY = np.mean(predicted, axis=1, keepdims=True)
-    
-    X0 = target - muX
-    Y0 = predicted - muY
 
-    normX = np.sqrt(np.sum(X0**2, axis=(1, 2), keepdims=True))
-    normY = np.sqrt(np.sum(Y0**2, axis=(1, 2), keepdims=True))
-    
-    X0 /= normX
-    Y0 /= normY
+def p_mpjpe(predicted_batch: ndarray, target_batch: ndarray) -> ndarray:
+    """Pose error: MPJPE after rigid alignment (scale, rotation, and translation), often referred to as "Protocol #2" in
+    many papers.
+    :param predicted_batch: The predicted pose. Shape: (B?, V?, S, J, D).
+    :param target_batch: The target pose. Shape: (B?, V?, S, J, D).
+    :return: The pose error. Shape: (1,).
+    """
+    assert predicted_batch.shape == target_batch.shape
 
-    H = np.matmul(X0.transpose(0, 2, 1), Y0)
+    target_frame_centroid = target_batch.mean(axis=-2, keepdims=True)
+    prediction_frame_centroid = predicted_batch.mean(axis=-2, keepdims=True)
+
+    translated_target = target_batch - target_frame_centroid
+    translated_prediction = predicted_batch - prediction_frame_centroid
+    norm_target = np.linalg.norm(translated_target, axis=(-1, -2), keepdims=True)
+    norm_prediction = np.linalg.norm(translated_prediction, axis=(-1, -2), keepdims=True)
+    translated_target /= norm_target
+    translated_prediction /= norm_prediction
+
+    H = translated_target.swapaxes(-1, -2) @ translated_prediction
     U, s, Vt = np.linalg.svd(H)
-    V = Vt.transpose(0, 2, 1)
-    R = np.matmul(V, U.transpose(0, 2, 1))
-
+    V = Vt.swapaxes(-1, -2)
+    R = V @ U.swapaxes(-1, -2)
     # Avoid improper rotations (reflections), i.e. rotations with det(R) = -1
-    sign_detR = np.sign(np.expand_dims(np.linalg.det(R), axis=1))
-    V[:, :, -1] *= sign_detR
-    s[:, -1] *= sign_detR.flatten()
-    R = np.matmul(V, U.transpose(0, 2, 1)) # Rotation
-    tr = np.expand_dims(np.sum(s, axis=1, keepdims=True), axis=2)
-    a = tr * normX / normY # Scale
-    t = muX - a*np.matmul(muY, R) # Translation
+    sign_detR = np.sign(np.linalg.det(R))
+    V[..., -1] *= sign_detR[..., None]
+    s[..., -1] *= sign_detR
+    R = V @ U.swapaxes(-1, -2)
+
+    tr = s.sum(axis=-1, keepdims=True)[..., None, :]
+    a = tr * norm_target / norm_prediction  # Scale
+    t = target_frame_centroid - a * (prediction_frame_centroid @ R)  # Translation
     # Perform rigid transformation on the input
-    predicted_aligned = a*np.matmul(predicted, R) + t
-    # Return MPJPE
-    return np.mean(np.linalg.norm(predicted_aligned - target, axis=len(target.shape)-1), axis=1)
+    predicted_aligned = a * (predicted_batch @ R) + t
+
+    return mpjpe(predicted_aligned, target_batch)
 
 
 # PyTorch-based errors (for losses)

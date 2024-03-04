@@ -228,10 +228,9 @@ def train_epoch(
 def train_with_config(args, opts):
     print(args)
     try:
-        os.makedirs(opts.checkpoint)
+        os.makedirs(opts.checkpoint, exist_ok=True)
     except OSError as e:
-        if e.errno != errno.EEXIST:
-            raise RuntimeError('Unable to create checkpoint directory:', opts.checkpoint)
+        raise RuntimeError('Unable to create checkpoint directory:', opts.checkpoint)
     train_writer = tensorboardX.SummaryWriter(os.path.join(opts.checkpoint, "logs"))
 
 

@@ -8,7 +8,8 @@ from torch.utils.data import Dataset, DataLoader
 from lib.data.augmentation import Augmenter3D
 from lib.utils.tools import read_pkl
 from lib.utils.utils_data import flip_data
-    
+
+
 class MotionDataset(Dataset):
     def __init__(self, data_root: Path, subset_list: list[str], data_split: Literal["test", "train"]): # data_split: train/test
         np.random.seed(0)
@@ -26,6 +27,7 @@ class MotionDataset(Dataset):
 
     def __getitem__(self, index):
         raise NotImplementedError 
+
 
 class MotionDataset3D(MotionDataset):
     def __init__(self, args, subset_list, data_split):
@@ -45,8 +47,8 @@ class MotionDataset3D(MotionDataset):
             if self.synthetic or self.gt_2d:
                 motion_3d = self.aug.augment3D(motion_3d)
                 motion_2d = np.zeros(motion_3d.shape, dtype=np.float32)
-                motion_2d[:,:,:2] = motion_3d[:,:,:2]
-                motion_2d[:,:,2] = 1                        # No 2D detection, use GT xy and c=1.
+                motion_2d[..., :2] = motion_3d[..., :2]
+                motion_2d[..., 2] = 1                        # No 2D detection, use GT xy and c=1.
             elif motion_file["data_input"] is not None:     # Have 2D detection 
                 motion_2d = motion_file["data_input"]
                 if self.flip and random.random() > 0.5:                        # Training augmentation - random flipping
@@ -57,8 +59,8 @@ class MotionDataset3D(MotionDataset):
         elif self.data_split=="test":                                           
             motion_2d = motion_file["data_input"]
             if self.gt_2d:
-                motion_2d[:,:,:2] = motion_3d[:,:,:2]
-                motion_2d[:,:,2] = 1
+                motion_2d[..., :2] = motion_3d[..., :2]
+                motion_2d[..., 2] = 1
         else:
             raise ValueError('Data split unknown.')    
         return torch.FloatTensor(motion_2d), torch.FloatTensor(motion_3d)

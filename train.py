@@ -152,7 +152,15 @@ def evaluate(args, model_pos, test_loader, datareader):
     print('----------')
     return e1, e2, results_all
         
-def train_epoch(args, model_pos, train_loader, losses, optimizer, has_3d, has_gt):
+def train_epoch(
+        args,
+        model_pos: torch.nn.Module,
+        train_loader: DataLoader,
+        losses: dict[str, AverageMeter],
+        optimizer: torch.optim.Optimizer,
+        has_3d: bool,
+        has_gt: bool,
+):
     model_pos.train()
     for idx, (batch_input, batch_gt) in tqdm(enumerate(train_loader)):    
         batch_size = len(batch_input)        

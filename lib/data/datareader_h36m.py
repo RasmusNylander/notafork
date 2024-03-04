@@ -79,17 +79,8 @@ class DataReaderH36M(object):
     def read_hw(self):
         if self.test_hw is not None:
             return self.test_hw
-        test_hw = np.zeros((len(self.dt_dataset['test']['camera_name']), 2))
-        for idx, camera_name in enumerate(self.dt_dataset['test']['camera_name']):
-            if camera_name == '54138969' or camera_name == '60457274':
-                res_w, res_h = 1000, 1002
-            elif camera_name == '55011271' or camera_name == '58860488':
-                res_w, res_h = 1000, 1000
-            else:
-                assert 0, '%d data item has an invalid camera name' % idx
-            test_hw[idx] = res_w, res_h
-        self.test_hw = test_hw
-        return test_hw
+        self.test_hw = self.resolution("test")
+        return self.test_hw
     
     def get_split_id(self):
         if self.split_id_train is not None and self.split_id_test is not None:

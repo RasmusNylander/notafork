@@ -165,8 +165,8 @@ def train_epoch(
         accumulate_gradients: int = 1,
 ):
     model_pos.train()
-    for idx, (batch_input, batch_gt) in tqdm(enumerate(train_loader)):    
-        batch_size = len(batch_input)        
+    for idx, (batch_input, batch_gt, performer_id) in enumerate(tqdm(train_loader)):
+        batch_size = len(batch_input)
         if torch.cuda.is_available():
             batch_input = batch_input.cuda()
             batch_gt = batch_gt.cuda()

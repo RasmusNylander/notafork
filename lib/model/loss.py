@@ -5,6 +5,8 @@ from numpy import ndarray
 import torch.nn.functional as F
 from torch import Tensor
 
+from lib.model.loss_utils import SVD
+
 
 # Numpy-based errors
 
@@ -198,3 +200,45 @@ def limb_angles(pose: Tensor) -> Tensor:
     limb_angle_cos = F.cosine_similarity(limb_pairs[..., 0, :], limb_pairs[..., 1, :], dim=-1)
     eps = 1e-7  # 1e-9 is too small to prevent crash on back-propagation
     return limb_angle_cos.clamp(-1 + eps, 1 - eps).acos()
+
+
+def consistency_loss(v1: Tensor, v2: Tensor) -> Tensor:
+    """
+    Loss penalizes if two pose sequences from different views aren't equal under a rigid transformation.
+    """
+    assert v1.shape == v2.shape
+
+    c, R, t = rigid_transform_3D(v1, v2)
+    v1_unrolled = v1.view(*v1.shape[:-3], -1, v1.shape[-1])
+    v1_aligned = ((v1_unrolled @ R.mT * c).T + t.mT.T).T.view(v1.shape)
+    view_mpjpe = (v1_aligned - v2).norm(dim=-1).mean(dim=(-2, -1))
+
+    return view_mpjpe.mean()
+
+
+def rigid_transform_3D(A: Tensor, B: Tensor) -> Tensor:
+    """
+    Compute rigid transformation from A to B by Procrustes analysis.
+    """
+    # TODO: Explain input shape
+    # TODO: document function
+    s, j = A.shape[-3:-1]
+    centroid_A = A.mean(dim=(-3, -2), keepdims=True)
+    centroid_B = B.mean(dim=(-3, -2), keepdims=True)
+
+    H = (A - centroid_A).reshape(*A.shape[:-3], -1, A.shape[-1]).mT @ (B - centroid_B).reshape(*B.shape[:-3], -1, B.shape[-1]) / (s*j)
+    U, s, V = SVD.apply(H)
+    R = V @ U.mT
+
+    reflections = R.det() < 0
+    V = V[reflections].clone()
+    V[..., -1] *= -1
+    R[reflections] = V @ U[reflections].mT
+    s = s.clone()
+    s.T[-1, reflections.T] *= -1
+
+    varP = A.var(dim=(-3, -2), keepdims=True).sum(-1, keepdims=True)
+    c = (1 / varP.T * s.sum(-1).T).T.squeeze(-2)  # TODO: Can VarP be 0?
+
+    t = centroid_B.squeeze(-2).mT - c * R @ centroid_A.squeeze(-2).mT
+    return c, R, t

@@ -67,15 +67,6 @@ def loss_mpjpe(predicted: Tensor, target: Tensor) -> Tensor:
     return (predicted - target).norm(dim=-1).mean()
 
 
-def weighted_mpjpe(predicted, target, w):
-    """
-    Weighted mean per-joint position error (i.e. mean Euclidean distance)
-    """
-    assert predicted.shape == target.shape
-    assert w.shape[0] == predicted.shape[0]
-    return torch.mean(w * torch.norm(predicted - target, dim=len(target.shape)-1))
-
-
 def loss_2d_weighted(predicted, target, conf):
     assert predicted.shape == target.shape
     predicted_2d = predicted[:,:,:,:2]

@@ -102,8 +102,14 @@ class DataReaderH36M(object):
         train_data, test_data = self.read_2d()     # train_data (1559752, 17, 3) test_data (566920, 17, 3)
         train_labels, test_labels = self.read_3d() # train_labels (1559752, 17, 3) test_labels (566920, 17, 3)
         split_id_train, split_id_test = self.get_split_id()
-        train_data, test_data = train_data[split_id_train], test_data[split_id_test]                # (N, 27, 17, 3)
-        train_labels, test_labels = train_labels[split_id_train], test_labels[split_id_test]        # (N, 27, 17, 3)
+        train_clip_source = np.asarray(self.dt_dataset['train']['source'][::self.sample_stride])[list(map(lambda x: x[0], split_id_train))]
+        test_clip_source = np.asarray(self.dt_dataset['test']['source'][::self.sample_stride])[list(map(lambda x: x[0], split_id_test))]
+        train_data, test_data = (unflatten_batch_and_view(train_data[split_id_train], train_clip_source),
+                                 unflatten_batch_and_view(test_data[split_id_test], test_clip_source))                # (N, 27, 17, 3)
+
+        # train_labels, test_labels = train_labels[split_id_train], test_labels[split_id_test]        # (N, 27, 17, 3)
+        train_labels, test_labels = (unflatten_batch_and_view(train_labels[split_id_train], train_clip_source),
+                                    unflatten_batch_and_view(test_labels[split_id_test], test_clip_source))            # (N, 27, 17, 3)
         # ipdb.set_trace()
         return train_data, test_data, train_labels, test_labels
     
@@ -119,3 +125,26 @@ class DataReaderH36M(object):
             data[idx, :, :, :2] = (data[idx, :, :, :2] + np.array([1, res_h / res_w])) * res_w / 2
             data[idx, :, :, 2:] = data[idx, :, :, 2:] * res_w / 2
         return data # [n_clips, -1, 17, 3]
+
+
+def unflatten_batch_and_view(array: ndarray, source: list) -> list[list[ndarray]]:
+    """Given a list of sources of the form 's_{SUBJECT ID}_act_{ACTION ID}(.+)?_cam_{CAMERA ID}' with shape (B,) and an array
+    of corresponding data with shape (B, ...), this function will reshape the array into (V, S, B', ...) where V is the
+    number of cameras, S is the number of subjects, and B' is the number of samples for each subject and camera.
+
+    :param array: The array of data to reshape.
+    :param source: The list of sources to use for reshaping the array.
+    :return: An array/list with shape (S, A, V, B', ...)
+    """
+    splits = np.asarray([s.split('_')[1::2] for s in source], dtype=int).T
+    subject, activity, camera = splits[[0, 1, -1]]
+    subject_indices = [np.where(subject == i)[0] for i in np.unique(subject)]
+    array = [array[subject] for subject in subject_indices]
+    activity_indices = [[np.where(activity[index] == i)[0] for i in np.unique(activity)] for index in subject_indices]
+    array = [[a[index] for index in indices] for a, indices in zip(array, activity_indices)]
+
+    # camera_indices = [[np.where(camera[index] == k)[0] for k in np.unique(camera)] for index in subject_indices]
+    # array = [a[index] for index, a in zip(camera_indices, array)]
+    camera_indices = [[[np.where(c[index] == k)[0] for k in np.unique(camera)] for index in indices] for c, indices in zip([camera[subject] for subject in subject_indices], activity_indices)]
+    array = [[a2[c2] for a2, c2 in zip(a, c)] for a, c in zip(array, camera_indices)]
+    return array

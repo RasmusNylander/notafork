@@ -95,8 +95,8 @@ class DataReaderH36M(object):
 #       Only Testset HW is needed for denormalization
         test_hw = self.read_hw()                                     # train_data (1559752, 2) test_data (566920, 2)
         split_id_train, split_id_test = self.get_split_id()
-        test_hw = test_hw[split_id_test][:,0,:]                      # (N, 2)
-        return test_hw
+        test_hw = test_hw[:, split_id_test][:, 0, :]                      # (2, N)
+        return test_hw.T
     
     def get_sliced_data(self):
         train_data, test_data = self.read_2d()     # train_data (1559752, 17, 3) test_data (566920, 17, 3)
@@ -110,8 +110,15 @@ class DataReaderH36M(object):
         # train_labels, test_labels = train_labels[split_id_train], test_labels[split_id_test]        # (N, 27, 17, 3)
         train_labels, test_labels = (unflatten_batch_and_view(train_labels[split_id_train], train_clip_source),
                                     unflatten_batch_and_view(test_labels[split_id_test], test_clip_source))            # (N, 27, 17, 3)
+
+        resolution_train, resolution_test = (unflatten_batch_and_view(self.resolution("train").T[split_id_train], train_clip_source),
+                                            unflatten_batch_and_view(self.resolution("test").T[split_id_test], test_clip_source))
+
+        remove_sequence = lambda res: list(map(lambda x: list(map(lambda y: y[..., 0, :], x)), res))
+        resolution_train, resolution_test = remove_sequence(resolution_train), remove_sequence(resolution_test)
+
         # ipdb.set_trace()
-        return train_data, test_data, train_labels, test_labels
+        return train_data, test_data, train_labels, test_labels, resolution_train, resolution_test
     
     def denormalize(self, test_data):
 #       data: (N, n_frames, 51) or data: (N, n_frames, 17, 3)        

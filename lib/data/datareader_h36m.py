@@ -91,13 +91,6 @@ class DataReaderH36M(object):
         self.split_id_test = split_clips(vid_list_test, self.n_frames, data_stride=self.data_stride_test)
         return self.split_id_train, self.split_id_test
     
-    def get_hw(self):
-#       Only Testset HW is needed for denormalization
-        test_hw = self.read_hw()                                     # train_data (1559752, 2) test_data (566920, 2)
-        split_id_train, split_id_test = self.get_split_id()
-        test_hw = test_hw[:, split_id_test][:, 0, :]                      # (2, N)
-        return test_hw.T
-    
     def get_sliced_data(self):
         train_data, test_data = self.read_2d()     # train_data (1559752, 17, 3) test_data (566920, 17, 3)
         train_labels, test_labels = self.read_3d() # train_labels (1559752, 17, 3) test_labels (566920, 17, 3)
@@ -129,19 +122,6 @@ class DataReaderH36M(object):
         action_test = remove_view(action_test)
 
         return train_data, test_data, train_labels, test_labels, resolution_train, resolution_test, factor_test, action_test, gt_test
-    
-    def denormalize(self, test_data):
-#       data: (N, n_frames, 51) or data: (N, n_frames, 17, 3)        
-        n_clips = test_data.shape[0]
-        test_hw = self.get_hw()
-        data = test_data.reshape([n_clips, -1, 17, 3])
-        assert len(data) == len(test_hw)
-        # denormalize (x,y,z) coordiantes for results
-        for idx, item in enumerate(data):
-            res_w, res_h = test_hw[idx]
-            data[idx, :, :, :2] = (data[idx, :, :, :2] + np.array([1, res_h / res_w])) * res_w / 2
-            data[idx, :, :, 2:] = data[idx, :, :, 2:] * res_w / 2
-        return data # [n_clips, -1, 17, 3]
 
 
 def unflatten_batch_and_view(array: ndarray, source: list) -> list[list[ndarray]]:

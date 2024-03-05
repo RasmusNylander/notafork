@@ -24,22 +24,23 @@ def save_clips(
         save_path.mkdir(parents=True)
     i = 0
     with tqdm(total=sum(map(lambda x: sum(map(lambda z: z.shape[1], x)), pose_2d)), desc=f"Saving {subset_name} data", unit="files") as pbar:
-        for performer_index, activity_index in product(range(len(performers)), range(len(pose_2d[0]))):
-            activity_2d = pose_2d[performer_index][activity_index].swapaxes(0, 1)
-            activity_target = target[performer_index][activity_index].swapaxes(0, 1)
-            res = resolution[performer_index][activity_index].swapaxes(0, 1)
-            for input, target, resolution in zip(activity_2d, activity_target, res):
-                data_dict = {
-                    "data_input": input,
-                    "data_label": target,
-                    "meta": {
-                        "performer": performers[performer_index],
-                        "resolution": resolution
+        for performer_index in range(len(performers)):
+            for activity_index in range(len(pose_2d[performer_index])):
+                activity_2d = pose_2d[performer_index][activity_index].swapaxes(0, 1)
+                activity_target = target[performer_index][activity_index].swapaxes(0, 1)
+                res = resolution[performer_index][activity_index].swapaxes(0, 1)
+                for input, targèt, reso in zip(activity_2d, activity_target, res):
+                    data_dict = {
+                        "data_input": input,
+                        "data_label": targèt,
+                        "meta": {
+                            "performer": performers[performer_index],
+                            "resolution": reso
+                        }
                     }
-                }
-                with open(save_path / f"{i:08d}.pkl", "wb") as file:
-                    pickle.dump(data_dict, file)
-                pbar.update(1); i += 1
+                    with open(save_path / f"{i:08d}.pkl", "wb") as file:
+                        pickle.dump(data_dict, file)
+                    pbar.update(1); i += 1
 
 data_root = Path(__file__).parent.parent / "data" / "motion3d"
 datareader = DataReaderH36M(n_frames=243, sample_stride=1, data_stride_train=81, data_stride_test=243, dt_file = 'h36m_sh_conf_cam_source_final.pkl', dt_root=data_root.as_posix())

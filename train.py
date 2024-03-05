@@ -126,6 +126,8 @@ def train_epoch(
         optimizer: torch.optim.Optimizer,
         has_3d: bool,
         has_gt: bool,
+        no_confidence: bool,
+        relative_to_root: bool,
         accumulate_gradients: int = 1,
 ):
     assert has_3d == True, "We do not support no 3D data yet."
@@ -137,9 +139,9 @@ def train_epoch(
             batch_input = batch_input.cuda()
             target = target.cuda()
         with torch.no_grad():
-            if args.no_conf:
+            if no_confidence:
                 batch_input = batch_input[..., :2]
-            if args.rootrel:
+            if relative_to_root:
                 target = target - target[..., 0:1, :]
             else:
                 target[..., 2] = target[..., 2] - target[..., 0:1, 0:1, 2] # Place the depth of first frame root to 0.
@@ -304,13 +306,18 @@ def train_with_config(args, opts):
             losses['angle_velocity'] = AverageMeter()
             losses["consistency"] = AverageMeter()
             N = 0
-                        
+
             # Curriculum Learning
             optimizer.zero_grad()
+            train = partial(
+                train_epoch,
+                args=args, model_pos=model_pos, losses=losses, optimizer=optimizer,
+                no_confidence=args.no_conf, relative_to_root=args.rootrel
+            )
             if args.train_2d and (epoch >= args.pretrain_3d_curriculum):
-                train_epoch(args, model_pos, posetrack_loader_2d, losses, optimizer, has_3d=False, has_gt=True)
-                train_epoch(args, model_pos, instav_loader_2d, losses, optimizer, has_3d=False, has_gt=False)
-            train_epoch(args, model_pos, train_loader_3d, losses, optimizer, has_3d=True, has_gt=True) 
+                train(posetrack_loader_2d, has_3d=False, has_gt=True)
+                train(instav_loader_2d, has_3d=False, has_gt=False)
+            train(train_loader_3d, has_3d=True, has_gt=True, accumulate_gradients=3)
             elapsed = (time() - start_time) / 60
 
             if args.no_eval:

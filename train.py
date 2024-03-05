@@ -316,9 +316,9 @@ def train_with_config(args, opts):
                 accumulate_gradients=args.accumulate_gradients,
             )
             if args.train_2d and (epoch >= args.pretrain_3d_curriculum):
-                train(posetrack_loader_2d, has_3d=False, has_gt=True)
-                train(instav_loader_2d, has_3d=False, has_gt=False)
-            train(train_loader_3d, has_3d=True, has_gt=True)
+                train(train_loader=posetrack_loader_2d, has_3d=False, has_gt=True)
+                train(train_loader=instav_loader_2d, has_3d=False, has_gt=False)
+            train(train_loader=train_loader_3d, has_3d=True, has_gt=True)
             elapsed = (time() - start_time) / 60
 
             if args.no_eval:

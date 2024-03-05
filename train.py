@@ -152,7 +152,7 @@ def train_epoch(
         special_performer = performer_id == 1
 
         function_weight_label = (
-            (loss_mpjpe, 1, "3d_pos"), (n_mpjpe, args.lambda_scale, "3d_scale"),
+            (loss_mpjpe, args.mpjpe_weight, "3d_pos"), (n_mpjpe, args.lambda_scale, "3d_scale"),
             (loss_velocity, args.lambda_3d_velocity, "3d_velocity"), (lambda x, t: loss_limb_var(x), args.lambda_lv, "lv"),
             (loss_limb_gt, args.lambda_lg, "lg"), (loss_angle, args.lambda_a, "angle"),
             (loss_angle_velocity, args.lambda_av, "angle_velocity")
@@ -170,7 +170,7 @@ def train_epoch(
                 target[~special_performer],
                 batch_input[~special_performer, ..., -1]
             )
-            loss_total += loss_2d_proj
+            loss_total += loss_2d_proj * args.mpjpe_2d_weight
             losses['2d_proj'].update(loss_2d_proj.item(), batch_size)
 
         if predicted_pose.size(1) > 1:

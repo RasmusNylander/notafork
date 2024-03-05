@@ -312,12 +312,13 @@ def train_with_config(args, opts):
             train = partial(
                 train_epoch,
                 args=args, model_pos=model_pos, losses=losses, optimizer=optimizer,
-                no_confidence=args.no_conf, relative_to_root=args.rootrel
+                no_confidence=args.no_conf, relative_to_root=args.rootrel,
+                accumulate_gradients=args.accumulate_gradients,
             )
             if args.train_2d and (epoch >= args.pretrain_3d_curriculum):
                 train(posetrack_loader_2d, has_3d=False, has_gt=True)
                 train(instav_loader_2d, has_3d=False, has_gt=False)
-            train(train_loader_3d, has_3d=True, has_gt=True, accumulate_gradients=3)
+            train(train_loader_3d, has_3d=True, has_gt=True)
             elapsed = (time() - start_time) / 60
 
             if args.no_eval:

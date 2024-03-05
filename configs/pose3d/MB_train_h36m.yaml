@@ -8,6 +8,7 @@ partial_train: null
 epochs: 120
 checkpoint_frequency: 30
 batch_size: 32
+accumulate_gradients: 1
 num_workers: 8
 dropout: 0.0
 learning_rate: 0.0002

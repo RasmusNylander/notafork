@@ -60,7 +60,7 @@ def evaluate(args, model_pos, test_loader, datareader):
     results_all = []
     model_pos.eval()            
     with torch.no_grad():
-        for batch_input, batch_gt in tqdm(test_loader):
+        for batch_input, batch_gt, performer, resolution, factor, gt, action_index in tqdm(test_loader):
             N, T = batch_gt.shape[:2]
             if torch.cuda.is_available():
                 batch_input = batch_input.cuda()

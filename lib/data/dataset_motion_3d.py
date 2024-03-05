@@ -37,7 +37,7 @@ class MotionDataset3D(MotionDataset):
         self.aug = Augmenter3D(args)
         self.gt_2d = args.gt_2d
 
-    def __getitem__(self, index) -> tuple[torch.FloatTensor, torch.FloatTensor, int]:
+    def __getitem__(self, index) -> tuple[torch.FloatTensor, torch.FloatTensor, int] | tuple[torch.FloatTensor, torch.FloatTensor, int, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         'Generates one sample of data'
         # Select sample
         file_path = self.file_list[index]
@@ -50,7 +50,15 @@ class MotionDataset3D(MotionDataset):
             if self.gt_2d:
                 motion_2d[..., :2] = motion_3d[..., :2]
                 motion_2d[..., 2] = 1
-            return torch.FloatTensor(motion_2d), torch.FloatTensor(motion_3d), motion_file["meta"]["performer"]
+            return (
+                torch.FloatTensor(motion_2d),
+                torch.FloatTensor(motion_3d),
+                motion_file["meta"]["performer"],
+                motion_file["meta"]["resolution"],
+                motion_file["meta"]["factor"],
+                motion_file["meta"]["gt"],
+                motion_file["meta"]["action"],
+            )
 
         assert self.data_split == "train"
 

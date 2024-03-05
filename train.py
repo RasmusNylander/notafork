@@ -201,7 +201,7 @@ def train_with_config(args, opts):
     trainloader_params = {
           'batch_size': args.batch_size,
           'shuffle': True,
-          'num_workers': 12,
+          'num_workers': args.num_workers,
           'pin_memory': True,
           'prefetch_factor': 4,
           'persistent_workers': True
@@ -210,7 +210,7 @@ def train_with_config(args, opts):
     testloader_params = {
           'batch_size': args.batch_size,
           'shuffle': False,
-          'num_workers': 12,
+          'num_workers': args.num_workers,
           'pin_memory': True,
           'prefetch_factor': 4,
           'persistent_workers': True

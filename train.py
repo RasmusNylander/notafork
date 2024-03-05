@@ -326,26 +326,27 @@ def train_with_config(args, opts):
                     elapsed,
                     lr,
                    losses['3d_pos'].avg))
-            else:
-                e1, e2, results_all = evaluate(args, model_pos, test_loader, datareader)
-                print('[%d] time %.2f lr %f 3d_train %f e1 %f e2 %f' % (
-                    epoch + 1,
-                    elapsed,
-                    lr,
-                    losses['3d_pos'].avg,
-                    e1, e2))
-                train_writer.add_scalar('Error P1', e1, epoch + 1)
-                train_writer.add_scalar('Error P2', e2, epoch + 1)
-                train_writer.add_scalar('loss_3d_pos', losses['3d_pos'].avg, epoch + 1)
-                train_writer.add_scalar('loss_2d_proj', losses['2d_proj'].avg, epoch + 1)
-                train_writer.add_scalar('loss_3d_scale', losses['3d_scale'].avg, epoch + 1)
-                train_writer.add_scalar('loss_3d_velocity', losses['3d_velocity'].avg, epoch + 1)
-                train_writer.add_scalar('loss_lv', losses['lv'].avg, epoch + 1)
-                train_writer.add_scalar('loss_lg', losses['lg'].avg, epoch + 1)
-                train_writer.add_scalar('loss_a', losses['angle'].avg, epoch + 1)
-                train_writer.add_scalar('loss_av', losses['angle_velocity'].avg, epoch + 1)
-                train_writer.add_scalar('loss_total', losses['total'].avg, epoch + 1)
-                
+                continue
+
+            e1, e2, results_all = evaluate(args, model_pos, test_loader, datareader)
+            print('[%d] time %.2f lr %f 3d_train %f e1 %f e2 %f' % (
+                epoch + 1,
+                elapsed,
+                lr,
+                losses['3d_pos'].avg,
+                e1, e2))
+            train_writer.add_scalar('Error P1', e1, epoch + 1)
+            train_writer.add_scalar('Error P2', e2, epoch + 1)
+            train_writer.add_scalar('loss_3d_pos', losses['3d_pos'].avg, epoch + 1)
+            train_writer.add_scalar('loss_2d_proj', losses['2d_proj'].avg, epoch + 1)
+            train_writer.add_scalar('loss_3d_scale', losses['3d_scale'].avg, epoch + 1)
+            train_writer.add_scalar('loss_3d_velocity', losses['3d_velocity'].avg, epoch + 1)
+            train_writer.add_scalar('loss_lv', losses['lv'].avg, epoch + 1)
+            train_writer.add_scalar('loss_lg', losses['lg'].avg, epoch + 1)
+            train_writer.add_scalar('loss_a', losses['angle'].avg, epoch + 1)
+            train_writer.add_scalar('loss_av', losses['angle_velocity'].avg, epoch + 1)
+            train_writer.add_scalar('loss_total', losses['total'].avg, epoch + 1)
+
             # Decay learning rate exponentially
             lr *= lr_decay
             for param_group in optimizer.param_groups:
@@ -355,7 +356,7 @@ def train_with_config(args, opts):
             chk_path = os.path.join(opts.checkpoint, 'epoch_{}.bin'.format(epoch))
             chk_path_latest = os.path.join(opts.checkpoint, 'latest_epoch.bin')
             chk_path_best = os.path.join(opts.checkpoint, 'best_epoch.bin'.format(epoch))
-            
+
             save_checkpoint(chk_path_latest, epoch, lr, optimizer, model_pos, min_loss)
             if (epoch + 1) % args.checkpoint_frequency == 0:
                 save_checkpoint(chk_path, epoch, lr, optimizer, model_pos, min_loss)

@@ -128,26 +128,26 @@ def train_epoch(
         has_gt: bool,
         accumulate_gradients: int = 1,
 ):
+    assert has_3d == True, "We do not support no 3D data yet."
+
     model_pos.train()
-    for idx, (batch_input, batch_gt, performer_id) in enumerate(tqdm(train_loader)):
+    for idx, (batch_input, target, performer_id) in enumerate(tqdm(train_loader)):
         batch_size = len(batch_input)
         if torch.cuda.is_available():
             batch_input = batch_input.cuda()
-            batch_gt = batch_gt.cuda()
+            target = target.cuda()
         with torch.no_grad():
             if args.no_conf:
                 batch_input = batch_input[..., :2]
-            if not has_3d:
-                conf = copy.deepcopy(batch_input[..., 2:])    # For 2D data, weight/confidence is at the last channel
             if args.rootrel:
-                batch_gt = batch_gt - batch_gt[..., 0:1, :]
+                target = target - target[..., 0:1, :]
             else:
-                batch_gt[..., 2] = batch_gt[..., 2] - batch_gt[..., 0:1, 0:1, 2] # Place the depth of first frame root to 0.
+                target[..., 2] = target[..., 2] - target[..., 0:1, 0:1, 2] # Place the depth of first frame root to 0.
             if args.mask or args.noise:
                 batch_input = args.aug.augment2D(batch_input, noise=(args.noise and has_gt), mask=args.mask)
         # Predict 3D poses
         as_batched = (-1, *batch_input.shape[2:])
-        predicted_3d_pos = model_pos(batch_input.view(as_batched)).view(batch_input.shape)    # (B*, T, 17, 3)
+        predicted_pose = model_pos(batch_input.view(as_batched)).view(batch_input.shape)    # (B*, T, 17, 3)
 
         special_performer = performer_id == 1
 
@@ -157,19 +157,25 @@ def train_epoch(
             (loss_limb_gt, args.lambda_lg, "lg"), (loss_angle, args.lambda_a, "angle"),
             (loss_angle_velocity, args.lambda_av, "angle_velocity")
         )
-        loss_total = torch.zeros(1, device=predicted_3d_pos.device)
-        for loss, weight, name in function_weight_label:
-            value = loss(predicted_3d_pos[special_performer], batch_gt[special_performer])
-            losses[name].update(value.item(), batch_size)
-            loss_total += weight * value
+        loss_total = torch.zeros(1, device=predicted_pose.device)
+        if special_performer.any():
+            for loss, weight, name in function_weight_label:
+                value = loss(predicted_pose[special_performer], target[special_performer])
+                losses[name].update(value.item(), batch_size)
+                loss_total += weight * value
 
-        loss_2d_proj = loss_2d_weighted(predicted_3d_pos[~special_performer], batch_gt[~special_performer], conf[~special_performer])
-        loss_total += loss_2d_proj
-        losses['2d_proj'].update(loss_2d_proj.item(), batch_size)
+        if (~special_performer).any():
+            loss_2d_proj = loss_2d_weighted(
+                predicted_pose[~special_performer],
+                target[~special_performer],
+                batch_input[~special_performer, ..., -1]
+            )
+            loss_total += loss_2d_proj
+            losses['2d_proj'].update(loss_2d_proj.item(), batch_size)
 
-        if predicted_3d_pos.size(1) > 1:
-            view_pairs = (*zip(*combinations(range(predicted_3d_pos.size(1)), 2)),)
-            consistency = consistency_loss(*predicted_3d_pos[:, view_pairs, ...].unbind(1))
+        if predicted_pose.size(1) > 1:
+            view_pairs = (*zip(*combinations(range(predicted_pose.size(1)), 2)),)
+            consistency = consistency_loss(*predicted_pose[:, view_pairs, ...].unbind(1))
             losses["consistency"].update(consistency.item(), batch_size)
             loss_total += args.lambda_consistency * consistency
 

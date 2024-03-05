@@ -102,10 +102,16 @@ class DataReaderH36M(object):
         train_data, test_data = self.read_2d()     # train_data (1559752, 17, 3) test_data (566920, 17, 3)
         train_labels, test_labels = self.read_3d() # train_labels (1559752, 17, 3) test_labels (566920, 17, 3)
         split_id_train, split_id_test = self.get_split_id()
+        gt_data = np.asarray(self.dt_dataset['test']['joints_2.5d_image'][::self.sample_stride])
+        test_factor = np.asarray(self.dt_dataset['test']['2.5d_factor'][::self.sample_stride])[split_id_test]
+
         train_clip_source = np.asarray(self.dt_dataset['train']['source'][::self.sample_stride])[list(map(lambda x: x[0], split_id_train))]
         test_clip_source = np.asarray(self.dt_dataset['test']['source'][::self.sample_stride])[list(map(lambda x: x[0], split_id_test))]
+        test_action = np.asarray(self.dt_dataset['test']['action'][::self.sample_stride])[list(map(lambda x: x[0], split_id_test))]
+
         train_data, test_data = (unflatten_batch_and_view(train_data[split_id_train], train_clip_source),
-                                 unflatten_batch_and_view(test_data[split_id_test], test_clip_source))                # (N, 27, 17, 3)
+                                 unflatten_batch_and_view(test_data[split_id_test], test_clip_source))
+        gt_test = unflatten_batch_and_view(gt_data[split_id_test], test_clip_source)
 
         # train_labels, test_labels = train_labels[split_id_train], test_labels[split_id_test]        # (N, 27, 17, 3)
         train_labels, test_labels = (unflatten_batch_and_view(train_labels[split_id_train], train_clip_source),
@@ -114,11 +120,15 @@ class DataReaderH36M(object):
         resolution_train, resolution_test = (unflatten_batch_and_view(self.resolution("train").T[split_id_train], train_clip_source),
                                             unflatten_batch_and_view(self.resolution("test").T[split_id_test], test_clip_source))
 
+        factor_test = unflatten_batch_and_view(test_factor, test_clip_source)
+        action_test = unflatten_batch_and_view(test_action, test_clip_source)
+
         remove_sequence = lambda res: list(map(lambda x: list(map(lambda y: y[..., 0, :], x)), res))
         resolution_train, resolution_test = remove_sequence(resolution_train), remove_sequence(resolution_test)
+        remove_view = lambda res: list(map(lambda x: list(map(lambda y: y[0], x)), res))
+        action_test = remove_view(action_test)
 
-        # ipdb.set_trace()
-        return train_data, test_data, train_labels, test_labels, resolution_train, resolution_test
+        return train_data, test_data, train_labels, test_labels, resolution_train, resolution_test, factor_test, action_test, gt_test
     
     def denormalize(self, test_data):
 #       data: (N, n_frames, 51) or data: (N, n_frames, 17, 3)        

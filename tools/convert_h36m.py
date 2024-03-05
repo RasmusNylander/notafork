@@ -1,7 +1,6 @@
 import os
 import sys
 import pickle
-from itertools import product
 from pathlib import Path
 
 from numpy import ndarray

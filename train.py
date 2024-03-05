@@ -25,7 +25,7 @@ from lib.utils.utils_data import flip_data
 from lib.data.dataset_motion_2d import PoseTrackDataset2D, InstaVDataset2D
 from lib.data.dataset_motion_3d import MotionDataset3D
 from lib.data.augmentation import Augmenter2D
-from lib.data.datareader_h36m import DataReaderH36M  
+from lib.data.datareader_h36m import DataReaderH36M
 from lib.model.loss import *
 
 def parse_args():
@@ -286,7 +286,8 @@ def train_with_config(args, opts):
         args.mask = (args.mask_ratio > 0 and args.mask_T_ratio > 0)
         if args.mask or args.noise:
             args.aug = Augmenter2D(args)
-        
+
+        evaluate(args, model_pos, test_loader, datareader)
         # Training
         for epoch in range(st, args.epochs):
             print('Training epoch %d.' % epoch)
